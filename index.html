@@ -56,11 +56,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- CONFIGURATION ---
-            // *** IMPORTANT: Make sure this is your correct Instance ID ***
             const INSTANCE_ID = "i-06a1e8fe86f278867";
-            
-            // This is the Vercel Serverless Function endpoint
             const API_ENDPOINT = '/api/ec2-handler'; 
+            const REFRESH_INTERVAL_MS = 30000; // 30 seconds
 
             // --- DOM ELEMENT REFERENCES ---
             const statusIndicator = document.getElementById('status-indicator');
@@ -70,7 +68,9 @@
             document.getElementById('instance-id-display').textContent = INSTANCE_ID;
 
             // --- STATE MANAGEMENT ---
-            let currentState = 'checking'; // Possible states: checking, running, stopped, pending, stopping, error
+            let currentState = 'checking'; 
+            // *** OPTIMIZATION: Store the timer ID so we can cancel it ***
+            let refreshTimeoutId = null; 
 
             // --- UI UPDATE LOGIC ---
             const statusConfig = {
@@ -89,7 +89,6 @@
                 statusText.textContent = config.text;
                 toggleButton.textContent = config.buttonText;
                 
-                // Reset button classes before applying the new one
                 toggleButton.className = `w-full mt-6 py-3 px-4 rounded-lg font-bold text-white transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:cursor-not-allowed disabled:transform-none ${config.buttonClass}`;
                 
                 toggleButton.disabled = !config.enabled;
@@ -100,18 +99,37 @@
                 messageBox.className = `mt-4 text-center font-medium h-5 ${isError ? 'text-red-400' : 'text-green-400'}`;
             }
 
+            // *** OPTIMIZATION: Function to schedule the next refresh ***
+            /**
+             * Clears any existing timer and schedules a new status check.
+             */
+            function scheduleRefresh() {
+                // Clear any old timer that might still be pending
+                clearTimeout(refreshTimeoutId);
+                
+                // Schedule the next check
+                refreshTimeoutId = setTimeout(fetchInstanceStatus, REFRESH_INTERVAL_MS);
+            }
+
             // --- API INTERACTION LOGIC ---
 
             /**
              * Fetches the current status of the EC2 instance from the backend.
              */
             async function fetchInstanceStatus() {
+                // Don't check if an action is already in progress (pending/stopping)
+                if (currentState === 'pending' || currentState === 'stopping') {
+                    return; 
+                }
+                
+                // Clear any pending refresh, as we are running one now.
+                clearTimeout(refreshTimeoutId);
+
                 currentState = 'checking';
                 updateUI(currentState);
                 showMessage('', false); // Clear previous messages
 
                 try {
-                    // *** REAL API CALL (Mock code removed) ***
                     const response = await fetch(`${API_ENDPOINT}?instanceId=${INSTANCE_ID}`);
                     if (!response.ok) {
                         const errData = await response.json();
@@ -126,6 +144,12 @@
                     showMessage(error.message || 'Could not fetch status.');
                 } finally {
                     updateUI(currentState);
+                    
+                    // *** OPTIMIZATION: Schedule the *next* refresh after this one completes ***
+                    // Only schedule a refresh if the page is currently visible
+                    if (document.visibilityState === 'visible') {
+                        scheduleRefresh();
+                    }
                 }
             }
 
@@ -133,13 +157,15 @@
              * Sends a command to start or stop the instance.
              */
             async function toggleInstanceStatus() {
+                // *** OPTIMIZATION: Stop the refresh timer while an action is in progress ***
+                clearTimeout(refreshTimeoutId);
+
                 const action = currentState === 'stopped' ? 'start' : 'stop';
                 currentState = action === 'start' ? 'pending' : 'stopping';
                 updateUI(currentState);
                 showMessage('', false);
 
                 try {
-                    // *** REAL API CALL (Mock code removed) ***
                     const response = await fetch(API_ENDPOINT, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -153,11 +179,9 @@
                     
                     const data = await response.json();
                     
-                    // After a successful toggle, re-check the status to confirm.
                     showMessage(`Instance ${action} command sent.`, false);
                     
-                    // Set a timeout to re-check the status after a few seconds,
-                    // giving the instance time to change state.
+                    // Check status after 3 seconds to see if it has updated
                     setTimeout(fetchInstanceStatus, 3000); 
 
                 } catch (error) {
@@ -165,18 +189,37 @@
                     currentState = 'error';
                     showMessage(error.message || `Failed to ${action} instance.`);
                     updateUI(currentState);
+                    
+                    // *** OPTIMIZATION: Restart polling even if the action failed ***
+                    scheduleRefresh();
                 }
             }
             
             // --- EVENT LISTENERS ---
             toggleButton.addEventListener('click', toggleInstanceStatus);
 
+            // *** OPTIMIZATION: Add Page Visibility API listener ***
+            /**
+             * Handles the browser tab becoming visible or hidden.
+             */
+            function handleVisibilityChange() {
+                if (document.visibilityState === 'visible') {
+                    // If tab is visible, immediately check the status, 
+                    // which will also restart the polling timer.
+                    showMessage('Tab refocused, checking status...', false);
+                    fetchInstanceStatus();
+                } else {
+                    // If tab is hidden, stop all future polling
+                    showMessage('Tab hidden, polling paused.', false);
+                    clearTimeout(refreshTimeoutId);
+                }
+            }
+
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
             // --- INITIALIZATION ---
             // Fetch the status as soon as the page loads
             fetchInstanceStatus();
-            
-            // Optional: Set an interval to automatically refresh the status every 30 seconds
-            setInterval(fetchInstanceStatus, 30000); 
         });
     </script>
 </body>
