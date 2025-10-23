@@ -56,9 +56,11 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- CONFIGURATION ---
-            const INSTANCE_ID = "i-0123456789abcdef0";
-            // IMPORTANT: Replace this with the URL you get after deploying your Vercel Serverless Function
-            const API_ENDPOINT = '/api/ec2-handler'; // This works for local dev and production on Vercel
+            // *** IMPORTANT: Make sure this is your correct Instance ID ***
+            const INSTANCE_ID = "i-06a1e8fe86f278867";
+            
+            // This is the Vercel Serverless Function endpoint
+            const API_ENDPOINT = '/api/ec2-handler'; 
 
             // --- DOM ELEMENT REFERENCES ---
             const statusIndicator = document.getElementById('status-indicator');
@@ -109,17 +111,19 @@
                 showMessage('', false); // Clear previous messages
 
                 try {
-                    // In a real app, this is where you'd make the API call.
-                    // To run this file locally without a backend, we'll simulate the response.
-                    // const response = await fetch(`${API_ENDPOINT}?instanceId=${INSTANCE_ID}`);
-                    // if (!response.ok) throw new Error('Network response was not ok.');
-                    // const data = await response.json();
-                    // currentState = data.status;
+                    // *** REAL API CALL (Mock code removed) ***
+                    const response = await fetch(`${API_ENDPOINT}?instanceId=${INSTANCE_ID}`);
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.message || 'Network response was not ok.');
+                    }
+                    const data = await response.json();
+                    currentState = data.status;
 
                 } catch (error) {
                     console.error("Failed to fetch status:", error);
                     currentState = 'error';
-                    showMessage('Could not fetch status.');
+                    showMessage(error.message || 'Could not fetch status.');
                 } finally {
                     updateUI(currentState);
                 }
@@ -135,24 +139,31 @@
                 showMessage('', false);
 
                 try {
-                    // In a real app, this is where you'd make the API call.
-                    // const response = await fetch(API_ENDPOINT, {
-                    //     method: 'POST',
-                    //     headers: { 'Content-Type': 'application/json' },
-                    //     body: JSON.stringify({ instanceId: INSTANCE_ID, action: action }),
-                    // });
-                    // if (!response.ok) throw new Error('Failed to send command.');
-                    // const data = await response.json();
+                    // *** REAL API CALL (Mock code removed) ***
+                    const response = await fetch(API_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ instanceId: INSTANCE_ID, action: action }),
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.message || 'Failed to send command.');
+                    }
                     
+                    const data = await response.json();
                     
                     // After a successful toggle, re-check the status to confirm.
                     showMessage(`Instance ${action} command sent.`, false);
-                    setTimeout(fetchInstanceStatus, 1000); // Check status after a short delay
+                    
+                    // Set a timeout to re-check the status after a few seconds,
+                    // giving the instance time to change state.
+                    setTimeout(fetchInstanceStatus, 3000); 
 
                 } catch (error) {
                     console.error(`Failed to ${action} instance:`, error);
                     currentState = 'error';
-                    showMessage(`Failed to ${action} instance.`);
+                    showMessage(error.message || `Failed to ${action} instance.`);
                     updateUI(currentState);
                 }
             }
@@ -161,9 +172,14 @@
             toggleButton.addEventListener('click', toggleInstanceStatus);
 
             // --- INITIALIZATION ---
+            // Fetch the status as soon as the page loads
             fetchInstanceStatus();
+            
+            // Optional: Set an interval to automatically refresh the status every 30 seconds
+            setInterval(fetchInstanceStatus, 30000); 
         });
     </script>
 </body>
 </html>
+
 
