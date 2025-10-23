@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC2 Instance Control</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Use the Inter font family */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen text-white p-4">
+
+    <main class="w-full max-w-md">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-teal-400">EC2 Instance Control</h1>
+            <p class="text-gray-400 mt-2">A lightweight panel to manage your server.</p>
+        </header>
+
+        <!-- Control Panel Card -->
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 border border-teal-500/20">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-gray-200">Instance Status</h2>
+                <!-- Instance ID Display -->
+                <div id="instance-id-display" class="text-sm font-mono text-teal-400 bg-gray-700 px-3 py-1 rounded-md">
+                    i-0123456789...
+                </div>
+            </div>
+
+            <!-- Status Indicator -->
+            <div class="bg-gray-700/50 p-4 rounded-lg flex items-center justify-between">
+                <div class="flex items-center">
+                    <span id="status-indicator" class="h-4 w-4 rounded-full bg-gray-500 animate-pulse"></span>
+                    <span id="status-text" class="ml-3 text-lg font-medium text-gray-100">Checking...</span>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <button id="toggle-button" class="w-full mt-6 py-3 px-4 rounded-lg font-bold text-white transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-gray-600">
+                Loading...
+            </button>
+        </div>
+
+        <!-- Message/Error Display -->
+        <div id="message-box" class="mt-4 text-center text-red-400 font-medium h-5"></div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONFIGURATION ---
+            const INSTANCE_ID = "i-0123456789abcdef0";
+            // IMPORTANT: Replace this with the URL you get after deploying your Vercel Serverless Function
+            const API_ENDPOINT = '/api/ec2-handler'; // This works for local dev and production on Vercel
+
+            // --- DOM ELEMENT REFERENCES ---
+            const statusIndicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const toggleButton = document.getElementById('toggle-button');
+            const messageBox = document.getElementById('message-box');
+            document.getElementById('instance-id-display').textContent = INSTANCE_ID;
+
+            // --- STATE MANAGEMENT ---
+            let currentState = 'checking'; // Possible states: checking, running, stopped, pending, stopping, error
+
+            // --- UI UPDATE LOGIC ---
+            const statusConfig = {
+                running: { indicator: 'bg-green-500', text: 'Running', buttonText: 'Stop Instance', buttonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500', enabled: true },
+                stopped: { indicator: 'bg-red-500', text: 'Stopped', buttonText: 'Start Instance', buttonClass: 'bg-green-600 hover:bg-green-700 focus:ring-green-500', enabled: true },
+                pending: { indicator: 'bg-yellow-500 animate-pulse', text: 'Pending...', buttonText: 'Starting...', buttonClass: 'bg-gray-600', enabled: false },
+                stopping: { indicator: 'bg-orange-500 animate-pulse', text: 'Stopping...', buttonText: 'Stopping...', buttonClass: 'bg-gray-600', enabled: false },
+                checking: { indicator: 'bg-gray-500 animate-pulse', text: 'Checking...', buttonText: 'Checking...', buttonClass: 'bg-gray-600', enabled: false },
+                error: { indicator: 'bg-gray-700', text: 'Error', buttonText: 'Unavailable', buttonClass: 'bg-gray-600', enabled: false }
+            };
+
+            function updateUI(state) {
+                const config = statusConfig[state] || statusConfig.error;
+                
+                statusIndicator.className = `h-4 w-4 rounded-full ${config.indicator}`;
+                statusText.textContent = config.text;
+                toggleButton.textContent = config.buttonText;
+                
+                // Reset button classes before applying the new one
+                toggleButton.className = `w-full mt-6 py-3 px-4 rounded-lg font-bold text-white transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:cursor-not-allowed disabled:transform-none ${config.buttonClass}`;
+                
+                toggleButton.disabled = !config.enabled;
+            }
+
+            function showMessage(message, isError = true) {
+                messageBox.textContent = message;
+                messageBox.className = `mt-4 text-center font-medium h-5 ${isError ? 'text-red-400' : 'text-green-400'}`;
+            }
+
+            // --- API INTERACTION LOGIC ---
+
+            /**
+             * Fetches the current status of the EC2 instance from the backend.
+             */
+            async function fetchInstanceStatus() {
+                currentState = 'checking';
+                updateUI(currentState);
+                showMessage('', false); // Clear previous messages
+
+                try {
+                    // In a real app, this is where you'd make the API call.
+                    // To run this file locally without a backend, we'll simulate the response.
+                    // const response = await fetch(`${API_ENDPOINT}?instanceId=${INSTANCE_ID}`);
+                    // if (!response.ok) throw new Error('Network response was not ok.');
+                    // const data = await response.json();
+                    // currentState = data.status;
+
+                } catch (error) {
+                    console.error("Failed to fetch status:", error);
+                    currentState = 'error';
+                    showMessage('Could not fetch status.');
+                } finally {
+                    updateUI(currentState);
+                }
+            }
+
+            /**
+             * Sends a command to start or stop the instance.
+             */
+            async function toggleInstanceStatus() {
+                const action = currentState === 'stopped' ? 'start' : 'stop';
+                currentState = action === 'start' ? 'pending' : 'stopping';
+                updateUI(currentState);
+                showMessage('', false);
+
+                try {
+                    // In a real app, this is where you'd make the API call.
+                    // const response = await fetch(API_ENDPOINT, {
+                    //     method: 'POST',
+                    //     headers: { 'Content-Type': 'application/json' },
+                    //     body: JSON.stringify({ instanceId: INSTANCE_ID, action: action }),
+                    // });
+                    // if (!response.ok) throw new Error('Failed to send command.');
+                    // const data = await response.json();
+                    
+                    
+                    // After a successful toggle, re-check the status to confirm.
+                    showMessage(`Instance ${action} command sent.`, false);
+                    setTimeout(fetchInstanceStatus, 1000); // Check status after a short delay
+
+                } catch (error) {
+                    console.error(`Failed to ${action} instance:`, error);
+                    currentState = 'error';
+                    showMessage(`Failed to ${action} instance.`);
+                    updateUI(currentState);
+                }
+            }
+            
+            // --- EVENT LISTENERS ---
+            toggleButton.addEventListener('click', toggleInstanceStatus);
+
+            // --- INITIALIZATION ---
+            fetchInstanceStatus();
+        });
+    </script>
+</body>
+</html>
+

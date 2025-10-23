@@ -1,0 +1,23 @@
+{
+  "name": "ec2-controlplane",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4shanzahid/ec2-controlplane.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/4shanzahid/ec2-controlplane/issues"
+  },
+  "homepage": "https://github.com/4shanzahid/ec2-controlplane#readme",
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.915.0"
+  }
+}
